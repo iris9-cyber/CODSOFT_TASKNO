@@ -1,0 +1,71 @@
+Train rows: 54214 | Test rows: 54200
+Number of genres: 27
+
+Training Naive Bayes ...
+Naive Bayes: accuracy=0.4693  macro-F1=0.0642  weighted-F1=0.3481
+
+Training Logistic Regression ...
+Logistic Regression: accuracy=0.5046  macro-F1=0.3761  weighted-F1=0.5237
+
+Training Linear SVM ...
+Linear SVM: accuracy=0.5629  macro-F1=0.3798  weighted-F1=0.5627
+
+Best model: Linear SVM
+
+Classification report (validation set, best model):
+              precision    recall  f1-score   support
+
+      action       0.34      0.48      0.39       263
+       adult       0.46      0.68      0.55       118
+   adventure       0.25      0.27      0.26       155
+   animation       0.20      0.22      0.21       100
+   biography       0.00      0.00      0.00        53
+      comedy       0.58      0.56      0.57      1490
+       crime       0.16      0.16      0.16       101
+ documentary       0.74      0.78      0.76      2619
+       drama       0.66      0.55      0.60      2723
+      family       0.22      0.23      0.22       157
+     fantasy       0.19      0.17      0.18        65
+   game-show       0.67      0.67      0.67        39
+     history       0.15      0.12      0.13        49
+      horror       0.56      0.71      0.62       441
+       music       0.51      0.68      0.58       146
+     musical       0.17      0.13      0.15        55
+     mystery       0.08      0.08      0.08        64
+        news       0.20      0.17      0.18        36
+  reality-tv       0.34      0.45      0.39       177
+     romance       0.14      0.19      0.17       134
+      sci-fi       0.36      0.54      0.43       129
+       short       0.46      0.38      0.42      1015
+       sport       0.53      0.72      0.61        86
+   talk-show       0.33      0.35      0.34        78
+    thriller       0.26      0.29      0.28       318
+         war       0.83      0.38      0.53        26
+     western       0.72      0.86      0.78       206
+
+    accuracy                           0.56     10843
+   macro avg       0.37      0.40      0.38     10843
+weighted avg       0.57      0.56      0.56     10843
+
+
+Retraining best model on the full labeled dataset ...
+
+Saved predictions -> test_predictions.csv
+   ID                                       TITLE PREDICTED_GENRE
+0   1                        Edgar's Lunch (1998)           short
+1   2                    La guerra de papá (1977)           drama
+2   3                 Off the Beaten Track (2010)     documentary
+3   4                      Meu Amigo Hindu (2015)           drama
+4   5                           Er nu zhai (1955)          action
+5   6                          Riddle Room (2016)           adult
+6   7                              L'amica (1969)           drama
+7   8                        Ina Mina Dika (1989)          comedy
+8   9  Equinox Special: Britain's Tornados (2005)     documentary
+9  10                                Press (2011)     documentary
+
+Saved: genre_classifier_model.joblib, tfidf_vectorizer.joblib,
+       evaluation_report.txt, confusion_matrix.png, test_predictions.csv
+
+Demo prediction for a sample plot:
+'A young wizard discovers he has magical powers and must defeat a dark lord threatening his school and the entire wizarding world.'
+-> Predicted genre: fantasy
