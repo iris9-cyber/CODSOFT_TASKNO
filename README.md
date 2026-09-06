@@ -1,99 +1,46 @@
-# CODSOFT_TASKN
-Task 1. This project predicts a movie's genre from its plot summary using classic NLP + ML techniques.
-Machine Learning internship project for **CodSoft**.
-This project predicts a movie's **genre** from its **plot summary** using classic NLP + ML techniques.
+# CODSOFT_TASKNO
 
----
+Quick start
+-----------
 
-# Problem Statement
+This repository contains a movie genre classification project (training script + README). The main training script is `movie_genre_classification.py`.
 
-Build a machine learning model that can predict the genre of a movie based on its plot
-summary or other textual information, using techniques like **TF-IDF** or word embeddings
-with classifiers such as **Naive Bayes**, **Logistic Regression**, or **Support Vector Machines
+1) Install dependencies:
 
-# Dataset
+   pip install -r requirements.txt
 
-Dataset used: [Genre Classification Dataset (IMDb) — Kaggle](https://www.kaggle.com/datasets/hijest/genre-classification-dataset-imdb)
+2) Provide the dataset files
 
-| File | Rows | Format |
-|------|------|--------|
-| `data/train_data.txt` | 54,214 | `ID ::: TITLE ::: GENRE ::: DESCRIPTION` |
-| `data/test_data.txt`  | 54,200 | `ID ::: TITLE ::: DESCRIPTION` (unlabeled) |
+   - Place your training file as `data/train_data.txt` and test file as `data/test_data.txt` (or edit the constants `TRAIN_PATH` and `TEST_PATH` at the top of `movie_genre_classification.py`).
 
-The training data covers **27 genres** (drama, documentary, comedy, horror, action, romance,
-sci-fi, thriller, etc.), with a natural class imbalance (drama/documentary/comedy are the
-most common).
+   Note: The original script used `/content/train_data.txt` and `/content/test_data.txt` (for Google Colab). If you run locally, either move files to those locations or update the paths in the script.
 
----
+3) Run training:
 
-##  Project Workflow ()
+   python movie_genre_classification.py
 
-### 1. Load the data
-Parsed the `:::`-delimited `.txt` files into pandas DataFrames.
+4) Outputs
 
-## 2. Text cleaning
-For every plot summary:
-- Lowercased text
-- Removed URLs and numbers
-- Stripped punctuation
-- Collapsed extra whitespace
+   After running, the script saves:
+   - models/final_model.joblib
+   - models/tfidf_vectorizer.joblib
+   - outputs/evaluation_report.txt
+   - outputs/confusion_matrix.png
+   - outputs/test_predictions.csv
 
-### 3. Train/validation split
-Used a **stratified 80/20 split** on the labeled data so rare genres are represented in
-both sets, giving an honest accuracy estimate.
+Files
+-----
 
-### 4. Feature extraction — TF-IDF
-Converted cleaned text into numeric features using `TfidfVectorizer`:
-- Unigrams + bigrams (`ngram_range=(1,2)`)
-- English stop words removed
-- Max 50,000 features
-- `sublinear_tf=True` to dampen very frequent terms
+- movie_genre_classification.py   -- Main training script (TF-IDF + models + output saving)
+- README.md                       -- This file
+- requirements.txt                 -- Python dependencies
+- .gitignore                       -- Typical Python ignores
+- data/                            -- Place dataset files here
+- models/                          -- Saved model artifacts (created by script)
+- outputs/                         -- Generated outputs (created by script)
 
-### 5. Model training & comparison
-Trained and compared three classifiers on the same TF-IDF features:
-
-| Model | Accuracy | Weighted F1 |
-|---|---|---|
-| Multinomial Naive Bayes | 46.9% | 0.348 |
-| Logistic Regression | 50.4% | 0.523 |
-| **Linear SVM** | **56.3%** | **0.563** |
-
-### 6. Model selection & evaluation
-Selected the **Linear SVM** (best weighted F1) and generated a full
-`classification_report` (precision/recall/F1 per genre) plus a confusion matrix
-heatmap for the 10 most common genres.
-
-### 7. Final training & prediction
-Retrained the winning model on **all** labeled data (not just the 80% split), then
-generated genre predictions for every row in the unlabeled `test_data.txt`.
-
-### 8. Artifacts saved
-- `genre_classifier_model.joblib` — trained Linear SVM model
-- `tfidf_vectorizer.joblib` — fitted TF-IDF vectorizer
-- `test_predictions.csv` — predicted genre for each test movie
-- `evaluation_report.txt` — full metrics for all 3 models
-- `confusion_matrix.png` — visual error analysis
-
----
-
-## 🗂️ Repository Structure
-
-```
-CODSOFT_1/
-├── data/
-│   ├── train_data.txt
-│   └── test_data.txt
-├── movie_genre_classification.py
-├── test_predictions.csv
-├── evaluation_report.txt
-├── confusion_matrix.png
-├── genre_classifier_model.joblib
-├── tfidf_vectorizer.joblib
-└── README.md
-```
-
-##  Acknowledgements
-
-Internship task provided by **[CodSoft](https://www.codsoft.in)**.
-
-#codsoft #internship #machinelearning
+Notes & next steps
+------------------
+- Consider updating `movie_genre_classification.py` to accept command-line arguments (argparse) and use relative paths — I can do that in a follow-up commit.
+- If your dataset contains multi-label genres (multiple genres per movie), we should convert labels using MultiLabelBinarizer and use a multi-label strategy.
+- If you want, I can also open a PR with more refactoring (split into src/, add tests, CI).
