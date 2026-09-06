@@ -1,0 +1,185 @@
+import re
+import string
+import joblib
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
+
+# 1. LOAD DATA
+
+TRAIN_PATH = "/content/train_data.txt"
+TEST_PATH = "/content/test_data.txt"
+
+train_cols = ["ID", "TITLE", "GENRE", "DESCRIPTION"]
+test_cols = ["ID", "TITLE", "DESCRIPTION"]
+
+train_df = pd.read_csv(TRAIN_PATH, sep=" ::: ", engine="python", names=train_cols)
+test_df = pd.read_csv(TEST_PATH, sep=" ::: ", engine="python", names=test_cols)
+
+print(f"Train rows: {len(train_df)} | Test rows: {len(test_df)}")
+print(f"Number of genres: {train_df['GENRE'].nunique()}")
+
+
+
+# 2. TEXT CLEANING
+
+def clean_text(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"http\S+|www\.\S+", " ", text)          
+    text = re.sub(r"\d+", " ", text)                        
+    text = text.translate(str.maketrans("", "", string.punctuation))  
+    text = re.sub(r"\s+", " ", text).strip()                
+    return text
+
+
+train_df["CLEAN_DESC"] = train_df["DESCRIPTION"].astype(str).apply(clean_text)
+test_df["CLEAN_DESC"] = test_df["DESCRIPTION"].astype(str).apply(clean_text)
+
+
+# 3. TRAIN / VALIDATION SPLIT (stratified, so rare genres appear in both)
+
+X = train_df["CLEAN_DESC"]
+y = train_df["GENRE"]
+
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+
+# 4. TF-IDF VECTORIZATION
+
+vectorizer = TfidfVectorizer(
+    max_features=50000,
+    ngram_range=(1, 2),
+    min_df=2,
+    sublinear_tf=True,
+    stop_words="english",
+)
+
+X_train_tfidf = vectorizer.fit_transform(X_train)
+X_val_tfidf = vectorizer.transform(X_val)
+
+
+# 5. TRAIN & COMPARE MODELS
+
+models = {
+    "Naive Bayes": MultinomialNB(),
+    "Logistic Regression": LogisticRegression(
+        max_iter=1000, class_weight="balanced", n_jobs=-1
+    ),
+    "Linear SVM": LinearSVC(class_weight="balanced"),
+}
+
+results = {}
+trained_models = {}
+
+for name, model in models.items():
+    print(f"\nTraining {name} ...")
+    model.fit(X_train_tfidf, y_train)
+    preds = model.predict(X_val_tfidf)
+
+    acc = accuracy_score(y_val, preds)
+    f1_macro = f1_score(y_val, preds, average="macro")
+    f1_weighted = f1_score(y_val, preds, average="weighted")
+
+    results[name] = {"accuracy": acc, "f1_macro": f1_macro, "f1_weighted": f1_weighted}
+    trained_models[name] = model
+
+    print(f"{name}: accuracy={acc:.4f}  macro-F1={f1_macro:.4f}  weighted-F1={f1_weighted:.4f}")
+
+
+# 6. PICK BEST MODEL (by weighted F1 - accounts for genre imbalance)
+
+best_name = max(results, key=lambda k: results[k]["f1_weighted"])
+best_model = trained_models[best_name]
+print(f"\nBest model: {best_name}")
+
+val_preds = best_model.predict(X_val_tfidf)
+print("\nClassification report (validation set, best model):")
+report_text = classification_report(y_val, val_preds, zero_division=0)
+print(report_text)
+
+
+# 7. RETRAIN BEST MODEL ON *ALL* LABELED DATA
+
+print("\nRetraining best model on the full labeled dataset ...")
+full_vectorizer = TfidfVectorizer(
+    max_features=50000, ngram_range=(1, 2), min_df=2, sublinear_tf=True, stop_words="english"
+)
+X_full_tfidf = full_vectorizer.fit_transform(X)
+
+final_model = models[best_name].__class__(**best_model.get_params())
+final_model.fit(X_full_tfidf, y)
+
+
+# 8. PREDICT ON THE UNLABELED TEST SET
+X_test_tfidf = full_vectorizer.transform(test_df["CLEAN_DESC"])
+test_preds = final_model.predict(X_test_tfidf)
+
+submission = test_df[["ID", "TITLE"]].copy()
+submission["PREDICTED_GENRE"] = test_preds
+submission.to_csv("test_predictions.csv", index=False)
+print("\nSaved predictions -> test_predictions.csv")
+print(submission.head(10))
+
+# 9. SAVE MODEL + VECTORIZER + REPORT + CONFUSION MATRIX PLOT
+
+joblib.dump(final_model, "genre_classifier_model.joblib")
+joblib.dump(full_vectorizer, "tfidf_vectorizer.joblib")
+
+with open("evaluation_report.txt", "w") as f:
+    f.write("MOVIE GENRE CLASSIFICATION - MODEL COMPARISON\n")
+    f.write("=" * 55 + "\n\n")
+    for name, m in results.items():
+        f.write(f"{name}:\n")
+        f.write(f"  Accuracy     : {m['accuracy']:.4f}\n")
+        f.write(f"  Macro F1     : {m['f1_macro']:.4f}\n")
+        f.write(f"  Weighted F1  : {m['f1_weighted']:.4f}\n\n")
+    f.write(f"BEST MODEL: {best_name}\n\n")
+    f.write("Classification Report (validation split, best model):\n")
+    f.write(report_text)
+
+# Confusion matrix heatmap for the best model (top genres only, for readability)
+top_genres = y.value_counts().head(10).index.tolist()
+mask = y_val.isin(top_genres)
+cm = confusion_matrix(y_val[mask], pd.Series(val_preds, index=y_val.index)[mask], labels=top_genres)
+
+fig, ax = plt.subplots(figsize=(8, 7))
+im = ax.imshow(cm, cmap="Blues")
+ax.set_xticks(range(len(top_genres)))
+ax.set_yticks(range(len(top_genres)))
+ax.set_xticklabels(top_genres, rotation=45, ha="right")
+ax.set_yticklabels(top_genres)
+ax.set_xlabel("Predicted")
+ax.set_ylabel("Actual")
+ax.set_title(f"Confusion Matrix - {best_name} (Top 10 Genres)")
+for i in range(len(top_genres)):
+    for j in range(len(top_genres)):
+        ax.text(j, i, cm[i, j], ha="center", va="center",
+                color="white" if cm[i, j] > cm.max() / 2 else "black", fontsize=8)
+plt.tight_layout()
+plt.savefig("confusion_matrix.png", dpi=150)
+print("\nSaved: genre_classifier_model.joblib, tfidf_vectorizer.joblib,")
+print("       evaluation_report.txt, confusion_matrix.png, test_predictions.csv")
+
+
+# 10. QUICK DEMO FUNCTION - predict genre for any custom plot summary
+
+def predict_genre(plot_summary: str) -> str:
+    cleaned = clean_text(plot_summary)
+    vec = full_vectorizer.transform([cleaned])
+    return final_model.predict(vec)[0]
+
+
+if __name__ == "__main__":
+    sample = ("A young wizard discovers he has magical powers and must defeat "
+              "a dark lord threatening his school and the entire wizarding world.")
+    print(f"\nDemo prediction for a sample plot:\n'{sample}'\n-> Predicted genre: {predict_genre(sample)}")
